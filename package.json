@@ -1,7 +1,7 @@
 {
   "name": "dsh-opencode-go-quota",
-  "version": "0.1.0",
-  "description": "OpenCode Go quota ring for DSH Web: shows 5-hour / weekly / monthly usage as a click-to-cycle progress ring left of the model selector.",
+  "version": "0.2.0",
+  "description": "OpenCode Go quota ring for DSH Web: shows 5-hour / weekly / monthly usage as a click-to-cycle progress ring left of the model selector, with tiered in-prompt quota warnings (Codex-CLI style).",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
