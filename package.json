@@ -1,0 +1,26 @@
+{
+  "name": "dsh-opencode-go-quota",
+  "version": "0.1.0",
+  "description": "OpenCode Go quota ring for DSH Web: shows 5-hour / weekly / monthly usage as a click-to-cycle progress ring left of the model selector.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# dsh-opencode-go-quota bundle patch: inserts the dual-face plugin row into
+# the web profile roster. The host half (exports ".") runs in the DSH host
+# process (the /ocg-quota/usage route), and the `dsh.client` declaration in
+# package.json makes the browser half (exports "./client") load in the GUI.
+- insert:
+    - id: ocg-quota
+      name: 'dsh-opencode-go-quota'
