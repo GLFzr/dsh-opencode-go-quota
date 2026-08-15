@@ -19,4 +19,4 @@ jobs:
           node --check lib/client.js
           node --check lib/usage-text.js
       - name: Unit tests
-        run: node --test tests/
+        run: node --test "tests/*.test.mjs"

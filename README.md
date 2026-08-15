@@ -12,9 +12,7 @@ OpenCode Go 额度圆环 —— DSH Web 的持久化插件。
 
 ## 对话内额度提醒（Codex CLI 式）
 
-每次 agent 请求时，插件会把**当前额度状态动态注入 system prompt**：
-
-agent 请求时插件会把额度状态动态注入 system prompt，**只在进入新档位时注入一次**（同档内后续请求不重复，prompt 前缀稳定、省 token、利于缓存命中）：
+每次 agent 请求时，插件会把**当前额度状态动态注入 system prompt**，**只在进入新档位时注入一次**（同档内后续请求不重复，prompt 前缀稳定、省 token、利于缓存命中）：
 
 | 5小时用量 | 行为 |
 |---|---|
@@ -67,4 +65,4 @@ dsh plugin --profile web remove dsh-opencode-go-quota
 
 ## 许可
 
-BSD-3-Clause
+MIT
