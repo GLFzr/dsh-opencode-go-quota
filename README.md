@@ -25,7 +25,7 @@ agent 请求时插件会把额度状态动态注入 system prompt，**只在进�
 
 窗口重置回 60% 以下后，升档记忆自动清除，下次爬升会重新按档提醒。
 
-阈值可通过 cordis.yml 配置（`warnAt` / `criticalAt` / `escalateFrom` / `escalateStep`，默认 60 / 80 / 90 / 2）：
+阈值可通过 cordis.yml 配置（`warnAt` / `criticalAt` / `escalateFrom` / `escalateStep`，默认 60 / 80 / 90 / 2；`cacheTtl` 为用量缓存秒数，默认 60；`weeklyWarnAt` / `monthlyWarnAt` 为周/月圆环警示阈值，默认 90 / 95）：
 
 ```yaml
 - id: dsh-opencode-go-quota
@@ -34,15 +34,18 @@ agent 请求时插件会把额度状态动态注入 system prompt，**只在进�
     criticalAt: 80
     escalateFrom: 90
     escalateStep: 2
+    cacheTtl: 60
+    weeklyWarnAt: 90
+    monthlyWarnAt: 95
 ```
 
-数据不可用（无 key / 接口失败）时注入为空，不产生 prompt 噪声。
+数据不可用（无 key / 接口失败）时注入为空，不产生 prompt 噪声；圆环显示灰色 `!`，悬停可见错误原因，宿主进程与浏览器控制台均有调试日志。
 
 ## 数据来源
 
 - Host 端通过 `node -`（stdin 脚本）读取 `~/.local/share/opencode/auth.json` 的 `opencode-go.key`
 - 调用官方接口 `GET https://opencode.ai/zen/go/v1/usage`（Bearer 鉴权）
-- 结果经 `/ocg-quota/usage` 路由（60 秒节流缓存，响应含 `thresholds`）提供给浏览器端与 prompt 注入
+- 结果经 `/ocg-quota/usage` 路由（`cacheTtl` 秒节流缓存，响应含 `thresholds`）提供给浏览器端与 prompt 注入
 
 ## 安装
 
