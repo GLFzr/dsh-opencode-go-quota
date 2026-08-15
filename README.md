@@ -41,9 +41,9 @@ OpenCode Go 额度圆环 —— DSH Web 的持久化插件。
 
 ## 数据来源
 
-- Host 端通过 `node -`（stdin 脚本）读取 `~/.local/share/opencode/auth.json` 的 `opencode-go.key`
+- Host 端通过 `node -`（stdin 脚本）读取 `~/.local/share/opencode/auth.json` 的 `opencode-go.key`（环境变量 `OPENCODE_GO_API_KEY` 优先；auth.json 容忍 UTF-8 BOM，文件缺失 / 解析失败 / 无 key 分别报错）
 - 调用官方接口 `GET https://opencode.ai/zen/go/v1/usage`（Bearer 鉴权）
-- 结果经 `/ocg-quota/usage` 路由（`cacheTtl` 秒节流缓存，响应含 `thresholds`）提供给浏览器端与 prompt 注入
+- 结果经 `/ocg-quota/usage` 路由（`cacheTtl` 秒节流缓存，失败结果按 `errorCacheTtl` 秒短缓存，默认 5；响应含 `thresholds`）提供给浏览器端与 prompt 注入
 
 ## 安装
 
@@ -62,6 +62,28 @@ dsh plugin --profile web add github:GLFzr/dsh-opencode-go-quota
 ```bash
 dsh plugin --profile web remove dsh-opencode-go-quota
 ```
+
+## 常见问题
+
+### 圆环显示灰色感叹号（宿主报 shell.run failed / windows-acl-run ...）
+
+插件需要宿主 shell 能运行子进程。DSH 的 Windows ACL 沙箱要求
+`sandbox-policy.workspaceRoot`（默认取 `dsh web` 启动目录）不包含系统 TEMP 目录；
+从用户主目录等位置启动 `dsh web` 会触发该限制（插件会显示友好提示）。
+
+解决：在 `~/.dsh/profiles/<profile>/cordis.patch.yml` 固定 workspace 根目录：
+
+    - id: sandbox-policy
+      config:
+        workspaceRoot: <你的 workspace 绝对路径>
+
+然后重启 dsh web。或临时在 workspace 目录内启动 `dsh web`。
+
+### 一直提示 "opencode-go key not found"
+
+- 检查 `~/.local/share/opencode/auth.json` 是否存在且含 `opencode-go.key`（已登录 OpenCode Go 即自动生成）；
+- 或设置环境变量 `OPENCODE_GO_API_KEY`（优先于 auth.json）后重启 dsh web；
+- auth.json 带 UTF-8 BOM 或损坏也会导致取 key 失败（0.3.2 起已容忍 BOM 并区分错误）。
 
 ## 许可
 

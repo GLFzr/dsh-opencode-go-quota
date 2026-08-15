@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.2] - 2026-08-15
+
+### 新增
+
+- **README「常见问题」**：Windows ACL 沙箱下圆环灰色感叹号（`sandbox-policy.workspaceRoot` 与 `dsh web` 启动目录耦合）的排障说明，及 key 缺失排查指引。
+
+### 改进
+
+- **沙箱错误人类可读化**：宿主沙箱不可用时（`windows-acl-run` / `no sandbox backend is usable`），tooltip 不再透传冗长的底层报错，改为可操作的中文提示（配置 workspaceRoot 或从 workspace 目录启动）。
+- **key 解析增强**：支持环境变量 `OPENCODE_GO_API_KEY`（优先于 auth.json）；auth.json 容忍 UTF-8 BOM（此前带 BOM 会误报 "key not found"）；区分"文件缺失 / 解析失败 / 无 key"三类错误。
+
+### 修复
+
+- **失败结果短缓存**：错误 payload 此前按成功 TTL（60s）缓存，接口恢复后需等待或手动刷新；现按 `errorCacheTtl`（默认 5 秒，可配置）短缓存，恢复后快速显示真实用量。
+
+### 测试
+
+- 新增：BOM 容忍与错误区分、沙箱错误映射（throw / stderr 两分支）、错误缓存 TTL。全量 **25/25 通过**。
+
 ## [0.3.1] - 2026-08-15
 
 ### 修复

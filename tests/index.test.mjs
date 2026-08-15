@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import { apply } from '../lib/index.js'
+import { apply, parseOpenCodeGoAuth } from '../lib/index.js'
 
 const OK_BODY = {
   usage: {
@@ -236,4 +236,56 @@ test('custom thresholds flow into the route payload and the section', async () =
   const r = await request(routes[0].handler, 'GET', '/ocg-quota/usage')
   assert.deepEqual(r.body.thresholds, { warnAt: 70, criticalAt: 90, escalateFrom: 95, escalateStep: 3, weeklyWarnAt: 85, monthlyWarnAt: 92 })
   assert.equal(sections[0].text(), '') // 42% below warnAt 70 → silent
+})
+
+test('parseOpenCodeGoAuth: BOM tolerance, failure distinction, empty-key rejection', () => {
+  assert.equal(parseOpenCodeGoAuth('{"opencode-go":{"key":"abc"}}'), 'abc')
+  // A UTF-8 BOM used to make JSON.parse throw, misreported as "key not found"
+  assert.equal(parseOpenCodeGoAuth('﻿{"opencode-go":{"key":"abc"}}'), 'abc')
+  assert.equal(parseOpenCodeGoAuth('{oops'), null) // unparseable
+  assert.equal(parseOpenCodeGoAuth('{"opencode-go":{}}'), null) // no key
+  assert.equal(parseOpenCodeGoAuth('{"opencode-go":{"key":""}}'), null) // empty key
+  assert.equal(parseOpenCodeGoAuth('{"other-provider":{"key":"x"}}'), null) // wrong entry
+  assert.equal(parseOpenCodeGoAuth(''), null)
+})
+
+test('sandbox-unavailable failures map to an actionable hint (shell.run throws)', async () => {
+  const msg = 'sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. ... Runner failure: windows-acl-run: Windows ACL temp root must be outside the workspace: workspace=C:\\Users\\x; temp=C:\\Users\\X~1\\AppData\\Local\\Temp'
+  const { ctx, routes } = makeCtx(async () => { throw new Error(msg) })
+  apply(ctx, {})
+  const r = await request(routes[0].handler, 'GET', '/ocg-quota/usage')
+  assert.equal(r.body.ok, false)
+  assert.match(r.body.error, /宿主沙箱不可用/)
+  assert.match(r.body.error, /workspaceRoot/)
+  assert.ok(!r.body.error.includes('windows-acl-run')) // raw internals hidden
+})
+
+test('sandbox-unavailable failures map to an actionable hint (runner stderr)', async () => {
+  const { ctx, routes } = makeCtx(async () => ({ exitCode: 127, stdout: { text: '' }, stderr: { text: 'windows-acl-run: Windows ACL temp root must be outside the workspace: workspace=C:\\x; temp=C:\\Temp' } }))
+  apply(ctx, {})
+  const r = await request(routes[0].handler, 'GET', '/ocg-quota/usage')
+  assert.equal(r.body.ok, false)
+  assert.match(r.body.error, /宿主沙箱不可用/)
+})
+
+test('error payloads expire after config.errorCacheTtl instead of cacheTtl', async () => {
+  let failing = true
+  let calls = 0
+  const runImpl = async () => {
+    calls++
+    if (failing) return { exitCode: 1, stdout: { text: '' }, stderr: { text: 'boom' } }
+    return { exitCode: 0, stdout: { text: childOut(OK_BODY) }, stderr: { text: '' } }
+  }
+  const { ctx, routes } = makeCtx(runImpl)
+  apply(ctx, { errorCacheTtl: 0.2 })
+  const handler = routes[0].handler
+  const r1 = await request(handler, 'GET', '/ocg-quota/usage')
+  assert.equal(r1.body.ok, false)
+  await request(handler, 'GET', '/ocg-quota/usage') // cached error → still 1 call
+  assert.equal(calls, 1)
+  await sleep(300) // error TTL (0.2s) expires
+  failing = false
+  const r2 = await request(handler, 'GET', '/ocg-quota/usage')
+  assert.equal(calls, 2)
+  assert.equal(r2.body.ok, true)
 })
