@@ -19,24 +19,39 @@ function childOut(body) {
   return JSON.stringify({ ok: true, status: 200, body })
 }
 
-/** Fake cordis ctx: captures the route, the prompt section, and the effects. */
-function makeCtx(runImpl) {
+/**
+ * Fake cordis ctx: captures the route, the prompt section, and the effects.
+ *
+ * The shell fake mirrors one DSH generation at a time, because the two differ
+ * in which method exists: 0.2 (the Desktop runtime) exposes only
+ * `execute(spec)`, resolving with a handle whose `result()` settles to the run
+ * result, while 0.1.x exposes only `run(spec)` itself.
+ * @param runImpl - produces the settled run result for one resolved spec.
+ * @param options - `legacy: true` models the pre-0.2 shell executor.
+ */
+function makeCtx(runImpl, { legacy = false } = {}) {
   const routes = []
   const sections = []
+  const calls = { execute: 0, run: 0 }
+  const shell = {
+    resolve(spec) { return spec },
+  }
+  if (legacy) {
+    shell.run = async (spec) => { calls.run++; return runImpl(spec) }
+  } else {
+    shell.execute = async (spec) => { calls.execute++; return { result: async () => runImpl(spec) } }
+  }
   const ctx = {
     webServer: {
       register(route) { routes.push(route); return () => {} },
     },
-    shell: {
-      resolve(spec) { return spec },
-      async run(spec) { return runImpl(spec) },
-    },
+    shell,
     systemPrompt: {
       section(section) { sections.push(section); return () => {} },
     },
     effect(fn) { return fn() },
   }
-  return { ctx, routes, sections }
+  return { ctx, routes, sections, calls }
 }
 
 /** One real HTTP request against a captured route handler. */
@@ -63,7 +78,7 @@ function request(handler, method, path, body) {
 }
 
 /** Stateful harness: mutate the simulated quota, fail the child, fetch. */
-function harness() {
+function harness(options) {
   let percent = 42
   let failing = false
   const runImpl = async () => {
@@ -77,11 +92,12 @@ function harness() {
     }
     return { exitCode: 0, stdout: { text: childOut(body) }, stderr: { text: '' } }
   }
-  const { ctx, routes, sections } = makeCtx(runImpl)
+  const { ctx, routes, sections, calls } = makeCtx(runImpl, options)
   apply(ctx, {})
   return {
     handler: routes[0].handler,
     sections,
+    calls,
     setPercent(p) { percent = p },
     setFailing(f) { failing = f },
     fetch(force) { return request(this.handler, force ? 'POST' : 'GET', '/ocg-quota/usage', force ? { refresh: true } : undefined) },
@@ -106,6 +122,23 @@ test('GET /ocg-quota/usage returns normalized windows and default thresholds', a
   assert.equal(r.body.windows[1].key, 'weekly')
   assert.equal(r.body.windows[2].key, 'monthly')
   assert.deepEqual(r.body.thresholds, { warnAt: 60, criticalAt: 80, escalateFrom: 90, escalateStep: 2, weeklyWarnAt: 90, monthlyWarnAt: 95 })
+})
+
+test('the modern shell API is used: execute(spec) then handle.result()', async () => {
+  const h = harness()
+  const r = await h.fetch(false)
+  assert.equal(r.body.ok, true)
+  assert.equal(h.calls.execute, 1)
+  assert.equal(h.calls.run, 0)
+})
+
+test('the pre-0.2 shell API still works: run(spec) alone', async () => {
+  const h = harness({ legacy: true })
+  const r = await h.fetch(false)
+  assert.equal(r.body.ok, true)
+  assert.equal(r.body.windows[0].percent, 42)
+  assert.equal(h.calls.run, 1)
+  assert.equal(h.calls.execute, 0)
 })
 
 test('usage is cached within cacheTtl; POST refresh bypasses the cache', async () => {
@@ -249,7 +282,7 @@ test('parseOpenCodeGoAuth: BOM tolerance, failure distinction, empty-key rejecti
   assert.equal(parseOpenCodeGoAuth(''), null)
 })
 
-test('sandbox-unavailable failures map to an actionable hint (shell.run throws)', async () => {
+test('sandbox-unavailable failures map to an actionable hint (executor rejects)', async () => {
   const msg = 'sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. ... Runner failure: windows-acl-run: Windows ACL temp root must be outside the workspace: workspace=C:\\Users\\x; temp=C:\\Users\\X~1\\AppData\\Local\\Temp'
   const { ctx, routes } = makeCtx(async () => { throw new Error(msg) })
   apply(ctx, {})

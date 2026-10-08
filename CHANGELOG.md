@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.3] - 2026-10-08
+
+### 修复
+
+- **适配 DSH Desktop（以及任何 0.2+ 宿主）**：宿主 shell 执行器在 0.2 把 `ShellExecutor.run(spec)` 换成了 `execute(spec)`——后者返回进程句柄，退出码与输出要再 `await handle.result()` 才拿到。此前插件只调 `run(spec)`，在桌面端一律失败为 `shell.run failed: shell.run is not a function`，圆环显示灰色感叹号。现按宿主实际提供的方法选择调用路径，0.1.x 与 0.2+ 同时可用。
+- **沙箱提示不再假设 CLI 启动方式**：原提示建议「从 workspace 目录启动 dsh web」，这在桌面端无意义（桌面宿主的工作目录固定为 `~/.dsh/profiles/desktop`，不由用户选择）。改为只给出唯一通用解法：在 profile 的 `cordis.patch.yml` 固定 `sandbox-policy.workspaceRoot`。
+
+### 文档
+
+- README 增加桌面端安装方式（用安装目录内的 `resources/runtime/cli/bin/dsh.cmd` 装进 `desktop` profile，再完全重启桌面端）、按 Web / 桌面端分述的沙箱 FAQ，以及两代 shell API 的兼容性说明。
+
+### 测试
+
+- 新增两个用例：现代宿主走 `execute(spec).result()`、旧宿主回退 `run(spec)`。全量 **27/27 通过**。
+
 ## [0.3.2] - 2026-08-15
 
 ### 新增
